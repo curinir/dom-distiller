@@ -81,7 +81,13 @@ You can use regular `git` command when developing in this project and use
 
 ## Uploading a CL for review
 
-On your branch, run: `git cl upload`.
+On your branch, run: `git cl upload`. The first time you do this, you will have
+to provide a username and password.
+- For username, use your @chromium.org. account.
+- For password, get it from
+[GoogleCode.com settings page](https://code.google.com/hosting/settings) when
+logged into your @chromium.org account, and add the full
+`machine code.google.com login` line to your `~/.netrc` file.
 
 ## Committing a CL
 
