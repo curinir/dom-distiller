@@ -1,5 +1,7 @@
 language: java
 before_install: sudo apt-get update
 install: sudo ./install-build-deps.sh
-before_script: sudo start xvfb
+before_script:
+  - "export DISPLAY=:99.0"
+  - "sh -e /etc/init.d/xvfb start"
 script: sudo ant test
