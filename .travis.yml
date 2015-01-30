@@ -1,0 +1,5 @@
+language: java
+before_install: sudo apt-get update
+install: sudo ./install-build-deps.sh
+before_script: sudo start xvfb
+script: sudo ant test
