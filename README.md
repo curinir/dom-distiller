@@ -228,7 +228,7 @@ file you include (for example `~/.bashrc`) and use it for iterative development:
 ```bash
 distill() {
   (
-    roll-distiller() && \
+    roll-distiller && \
     ninja -C out/Debug components_browsertests &&
     xvfb-run out/Debug/components_browsertests \
       --gtest_filter='*MANUAL_ExtractUrl' \
@@ -241,7 +241,7 @@ distill() {
 }
 ```
 
-Usage:
+Usage when running from `$CHROME_SRC`:
 
 ```bash
 distill http://example.com/article.html
