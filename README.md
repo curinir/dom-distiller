@@ -1,3 +1,23 @@
+# DOM Distiller
+
+DOM Distiller aims to provide a better reading experience by distilling the
+content of the page. This distilled content can then be used in a variety of
+ways.
+
+The current efforts that will be powered by DOM Distiller:
+- Reader mode: a mobile-friendly viewing mode for Chrome mobile
+
+## How to use Reader mode on mobile Chrome
+
+- Open Chrome on your mobile device
+- Navigate to [chrome://flags](chrome://flags) and search for "Reader mode"
+  (Menu -> Find in page -> Enable Reader Mode Toolbar Icon), or directly go to
+  [chrome://flags#enable-reader-mode-toolbar-icon](chrome://flags#enable-reader-mode-toolbar-icon)
+- Click Enable to turn on Reader mode
+- Click "Relaunch Now" at the bottom of the page
+- Next time you're trying to read a page, tap on the "Reader mode" icon in
+  the toolbar to try it out!
+
 # Continuous integration
 
 - [![Build Status](https://drone.io/github.com/chromium/dom-distiller/status.png)](https://drone.io/github.com/chromium/dom-distiller/latest)
@@ -24,10 +44,46 @@ ChromeDriver requires Google Chrome to be installed at a specific location
 [ChromeDriver documentation](https://code.google.com/p/selenium/wiki/ChromeDriver)
 for details.
 
+## Developing on Linux
+
 Install the dependencies by entering the `dom-distiller` folder and running:
 ```bash
 sudo ./install-build-deps.sh
 ```
+
+## Developing on Mac OS X
+
+- Install JDK 7 using either your organizations software management tool,
+or download it from
+[Oracle](http://www.oracle.com/technetwork/java/javase/downloads/jdk7-downloads-1880260.html).
+- Install [Homebrew](http://brew.sh/).
+- Install `ant` and `python` using Homebrew:
+```bash
+brew install ant python
+```
+- Since both the protocol buffer compiler and Python bindings are needed,
+install the `protobuf` package with the `--with-python` command line parameter:
+```bash
+brew install protobuf --with-python
+```
+- Create a folder named `buildtools` inside your DOM Distiller checkout
+- Download ChromeDriver (chromedriver_mac32.zip) from the
+[Download page](https://sites.google.com/a/chromium.org/chromedriver/downloads)
+- Unzip the `chromedriver_mac32.zip` and ensure the binary ends up in your
+`buildtools` folder.
+- Install the PyPI package management tool `pip` by running:
+```
+sudo easy_install pip
+```
+- Install `selenium` using `pip`:
+```
+pip install selenium
+```
+
+For the rest of this guide, there are sometimes references to a tool called
+`xvfb` and specifically when running shell commands using `xvfb-run`. When you
+develop using a Mac OS X, you can remove that part of the command. For example
+`xvfb-run echo` would just become `echo`.
 
 ## Tools for contributing
 
@@ -105,6 +161,20 @@ git branch -u master
   [application settings page](https://github.com/settings/applications) and use
   that as your password.
 
+## Code formatting
+
+Before uploading a CL it is recommended to run `git cl format`. However, this
+requires adding symbolic links to your chromium checkout.
+
+Inside the `buildtools` folder of your checkout, add the following symbolic
+links:
+- `clang_format`	&rarr; `/path/to/chromium/src/buildtools/clang_format/`
+- `linux64` ->	&rarr; `/path/to/chromium/src/buildtools/linux64/` (only for Linux 64-bit platform)
+- `mac` &rarr; `/path/to/chromium/mac/buildtools/linux64/` (only for Mac platform)
+
+Doing this enables you to run the command `git cl format` to fix the formatting
+of your code.
+
 # Run in Chrome for desktop
 
 In this section, the following shell variables and are assumed correctly set:
@@ -144,6 +214,8 @@ out/Debug/chrome --enable-dom-distiller
 - You can also go to `chrome://dom-distiller` to access the debug page.
 - To have a unique user profile every time you run Chrome, you can also add
 `--user-data-dir=/tmp/$(mktemp -d)` as a command line parameter.
+On Mac OS X, you can instead write
+`--user-data-dir=$(mktemp -d 2>/dev/null || mktemp -d -t 'chromeprofile')`.
 
 ## Running the automated tests in Chromium
 
@@ -219,7 +291,8 @@ distill http://example.com/article.html
 You can use the Chrome Developer Tools to debug DOM Distiller:
 - Update the test JavaScript by running `ant extractjs.jstests` or `ant test`.
 - Open `war/test.html` in Chrome desktop
-- Open the `Console` panel in Developer Tools (Ctrl-Shift-J).
+- Open the `Console` panel in Developer Tools (**Ctrl-Shift-J**).
+On Mac OS X you can use **&#x2325;-&#x2318;-I** (uppercase `I`) as the shortcut.
 - Run all tests by calling:
 ```javascript
 org.chromium.distiller.JsTestEntry.run()

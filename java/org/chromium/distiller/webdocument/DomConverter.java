@@ -14,8 +14,14 @@ import com.google.gwt.dom.client.Node;
 import com.google.gwt.dom.client.Style;
 import com.google.gwt.dom.client.TableElement;
 import com.google.gwt.dom.client.Text;
+import org.chromium.distiller.extractors.embeds.EmbedExtractor;
+import org.chromium.distiller.extractors.embeds.TwitterExtractor;
+import org.chromium.distiller.extractors.embeds.VimeoExtractor;
+import org.chromium.distiller.extractors.embeds.YouTubeExtractor;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -25,21 +31,28 @@ import java.util.Set;
  */
 public class DomConverter implements DomWalker.Visitor {
     private final WebDocumentBuilderInterface builder;
-    private final Set<Node> dataTables;
     private final Set<Node> hiddenElements;
+    private final List<EmbedExtractor> extractors;
+    // For quick lookup of tags that could possibly be embeds.
+    private final HashSet<String> embedTagNames;
 
     public DomConverter(WebDocumentBuilderInterface builder) {
         hiddenElements = new HashSet<Node>();
-        dataTables = new HashSet<Node>();
         this.builder = builder;
+
+        extractors = new ArrayList<EmbedExtractor>();
+        extractors.add(new TwitterExtractor());
+        extractors.add(new VimeoExtractor());
+        extractors.add(new YouTubeExtractor());
+
+        embedTagNames = new HashSet<>();
+        for (EmbedExtractor extractor : extractors) {
+            embedTagNames.addAll(extractor.getRelevantTagNames());
+        }
     }
 
     public final Set<Node> getHiddenElements() {
         return hiddenElements;
-    }
-
-    public final Set<Node> getDataTables() {
-        return dataTables;
     }
 
     @Override
@@ -69,6 +82,21 @@ public class DomConverter implements DomWalker.Visitor {
             return false;
         }
 
+        // Node-type specific extractors check for elements they are interested in here. Everything
+        // else will be filtered through the switch below.
+
+        // Check for embedded elements that might be extracted.
+        if (embedTagNames.contains(e.getTagName())) {
+            // If the tag is marked as interesting, check the extractors.
+            for (EmbedExtractor extractor : extractors) {
+                WebEmbed embed = extractor.extract(e);
+                if (embed != null) {
+                    builder.embed(embed);
+                    return false;
+                }
+            }
+        }
+
         switch (e.getTagName()) {
             // Skip data tables, keep track of them to be extracted by RelevantElementsFinder
             // later.
@@ -76,7 +104,7 @@ public class DomConverter implements DomWalker.Visitor {
                 TableClassifier.Type type = TableClassifier.table(TableElement.as(e));
                 logTableInfo(e, type);
                 if (type == TableClassifier.Type.DATA) {
-                    dataTables.add(e);
+                    builder.dataTable(e);
                     return false;
                 }
                 break;

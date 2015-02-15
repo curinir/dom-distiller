@@ -12,4 +12,6 @@ public interface WebDocumentBuilderInterface {
     void startElement(Element element);
     void endElement();
     void textNode(Text textNode);
+    void dataTable(Element e);
+    void embed(WebEmbed embedNode);
 }
