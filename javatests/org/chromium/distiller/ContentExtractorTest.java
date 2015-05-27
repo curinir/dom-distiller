@@ -12,8 +12,6 @@ public class ContentExtractorTest extends DomDistillerJsTestCase {
     private static final String TITLE_TEXT = "I am the document title";
 
     public void testDoesNotExtractTitleInContent() {
-        mRoot.appendChild(mBody);
-
         Element titleDiv = TestUtil.createDiv(0);
         titleDiv.appendChild(TestUtil.createText(TITLE_TEXT));
         mBody.appendChild(titleDiv);
@@ -63,9 +61,9 @@ public class ContentExtractorTest extends DomDistillerJsTestCase {
 
         ContentExtractor extractor = new ContentExtractor(mRoot);
         String extractedContent = extractor.extractContent();
-        assertEquals("<span>" + CONTENT_TEXT + "</span> " +
+        assertEquals("<div><span>" + CONTENT_TEXT + "</span> " +
                      "<span>" + CONTENT_TEXT + "</span>\n" +
-                     "<span>" + CONTENT_TEXT + "</span> ",
+                     "<span>" + CONTENT_TEXT + "</span> </div>",
                 TestUtil.removeAllDirAttributes(extractedContent));
     }
 
@@ -88,7 +86,56 @@ public class ContentExtractorTest extends DomDistillerJsTestCase {
                 MARKUP_PARSER_TITLE, extractor.extractTitle());
     }
 
+    public void testImageWithSrcset() {
+        final String html =
+            "<h1>" + CONTENT_TEXT + "</h1>" +
+            "<img src=\"image\" srcset=\"image200 200w, image400 400w\">" +
+            "<table role=\"grid\"><tbody><tr><td>" +
+                "<img src=\"image\" srcset=\"image200 200w, image400 400w\">" +
+                "</td></tr></tbody></table>" +
+            "<p>" + CONTENT_TEXT + "</p>";
+
+        final String expected =
+            "<h1>" + CONTENT_TEXT + "</h1>" +
+            "<img src=\"http://example.com/image\">" +
+            "<table role=\"grid\"><tbody><tr><td>" +
+                "<img src=\"http://example.com/image\">" +
+            "</td></tr></tbody></table>" +
+            "<p>" + CONTENT_TEXT + "</p>";
+
+        mHead.setInnerHTML("<base href=\"http://example.com/\">");
+        mBody.setInnerHTML(html);
+
+        ContentExtractor extractor = new ContentExtractor(mRoot);
+        String extractedContent = extractor.extractContent();
+
+        assertEquals(expected,
+                TestUtil.removeAllDirAttributes(extractedContent));
+    }
+
     private void createMeta(String property, String content) {
         mHead.appendChild(TestUtil.createMetaProperty(property, content));
+    }
+
+    public void testRemoveFontColorAttributes() {
+        Element outerFontTag = Document.get().createElement("FONT");
+        outerFontTag.setAttribute("COLOR", "blue");
+        mBody.appendChild(outerFontTag);
+
+        String text = "<font color=\"red\">" + CONTENT_TEXT + "</font>";
+
+        outerFontTag.appendChild(TestUtil.createSpan(text));
+        outerFontTag.appendChild(TestUtil.createText(" "));
+        outerFontTag.appendChild(TestUtil.createSpan(text));
+        outerFontTag.appendChild(TestUtil.createText("\n"));
+        outerFontTag.appendChild(TestUtil.createSpan(text));
+        outerFontTag.appendChild(TestUtil.createText(" "));
+
+        ContentExtractor extractor = new ContentExtractor(mRoot);
+        String extractedContent = extractor.extractContent();
+        assertEquals("<font><span><font>" + CONTENT_TEXT + "</font></span> " +
+                     "<span><font>" + CONTENT_TEXT + "</font></span>\n" +
+                     "<span><font>" + CONTENT_TEXT + "</font></span> </font>",
+                TestUtil.removeAllDirAttributes(extractedContent));
     }
 }

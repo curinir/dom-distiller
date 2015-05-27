@@ -4,11 +4,10 @@
 
 package org.chromium.distiller.webdocument;
 
-import org.chromium.distiller.NodeListExpander;
-import org.chromium.distiller.JavaScript;
+import com.google.gwt.dom.client.Element;
+import org.chromium.distiller.DomUtil;
+import org.chromium.distiller.TreeCloneBuilder;
 import org.chromium.distiller.labels.DefaultLabels;
-
-import com.google.gwt.dom.client.Document;
 import com.google.gwt.dom.client.Node;
 
 import java.util.List;
@@ -24,6 +23,9 @@ public class WebText extends WebElement {
     private Set<String> labels;
     private int tagLevel;
     private int offsetBlock;
+    // If this text needs to be split to place an image properly its group will signify how they
+    // should be joined again (same group numbers get merged).
+    private int groupNumber;
 
     public WebText(String text, List<Node> allTextNodes, int start, int end, int firstWordNode,
             int lastWordNode, int numWords, int numLinkedWords, int tagLevel, int offsetBlock) {
@@ -47,10 +49,30 @@ public class WebText extends WebElement {
     }
 
     @Override
-    public void addOutputNodes(List<Node> nodes, boolean includeTitle) {
-        if (includeTitle || !hasLabel(DefaultLabels.TITLE)) {
-            nodes.addAll(getTextNodes());
+    public String generateOutput(boolean textOnly) {
+        if (hasLabel(DefaultLabels.TITLE)) return "";
+
+        // TODO(mdjones): Instead of doing this next part, in the future track font size weight
+        // and etc. and wrap the nodes in a "p" tag.
+        Node clonedRoot = TreeCloneBuilder.buildTreeClone(getTextNodes());
+
+        // To keep formatting/structure, at least one parent element should be in the output. This
+        // is necessary because many times a WebText is only a single node.
+        if (clonedRoot.getNodeType() != Node.ELEMENT_NODE) {
+            Node parentClone = getTextNodes().get(0).getParentElement().cloneNode(false);
+            parentClone.appendChild(clonedRoot);
+            clonedRoot = parentClone;
         }
+
+        // Make sure links are absolute and IDs are gone.
+        DomUtil.makeAllLinksAbsolute(clonedRoot);
+        DomUtil.stripIds(clonedRoot);
+        DomUtil.stripFontColorAttributes(clonedRoot);
+
+        if (textOnly) {
+            return Element.as(clonedRoot).getInnerText();
+        }
+        return Element.as(clonedRoot).getString();
     }
 
     public List<Node> getTextNodes() {
@@ -101,5 +123,13 @@ public class WebText extends WebElement {
         Set<String> res = labels;
         labels = new HashSet<String>();
         return res;
+    }
+
+    public void setGroupNumber(int group) {
+        groupNumber = group;
+    }
+
+    public int getGroupNumber() {
+        return groupNumber;
     }
 }

@@ -50,4 +50,39 @@ public class StringUtil {
         var m = s.match(/(\S*[\w\u00C0-\u1FFF\u2C00-\uD7FF]\S*)/g);
         return m ? m.length : 0;
     }-*/;
+
+    public static native String regexEscape(String s) /*-{
+        return s.replace(/[\-\[\]{}()*+?.,\\\^$|#\s]/g, "\\$&");
+    }-*/;
+
+    /*
+     * Returns true if character is a digit.
+     */
+    public static native boolean isDigit(Character c) /*-{
+        return /\d/.test(c);
+    }-*/;
+
+    /**
+     * Returns true if the entire string contains only digits.
+     */
+    public static native boolean isStringAllDigits(String s) /*-{
+        return /^\d+$/.test(s);
+    }-*/;
+
+    /**
+     * Returns true if string contains at least 1 digit.
+     */
+    public static native boolean containsDigit(String s) /*-{
+        return /\d/.test(s);
+    }-*/;
+
+    /**
+     * Returns the plain number if given string can be converted to one >= 0.
+     * Returns -1 if string is empty or not all digits.
+     */
+    public static int toNumber(String s) {
+        if (s.isEmpty() || !StringUtil.isStringAllDigits(s)) return -1;
+        return JavaScript.parseInt(s, 10);
+    }
+
 }

@@ -5,6 +5,7 @@
 package org.chromium.distiller.webdocument;
 
 import org.chromium.distiller.DomDistillerJsTestCase;
+import org.chromium.distiller.DomUtil;
 import org.chromium.distiller.labels.DefaultLabels;
 
 import com.google.gwt.dom.client.Document;
@@ -85,6 +86,18 @@ public class ElementActionTest extends DomDistillerJsTestCase {
         assertFalse(hasLabel(getForHtml("<span></span>"), DefaultLabels.STRICTLY_NOT_CONTENT));
         assertFalse(hasLabel(getForHtml("<div></div>"), DefaultLabels.STRICTLY_NOT_CONTENT));
 
+        Document newDocument = DomUtil.createHTMLDocument(Document.get());
+
+        Element htmlElement = DomUtil.getFirstElementChild(newDocument);
+        htmlElement.setClassName("comment");
+        assertFalse(hasLabel(ElementAction.getForElement(htmlElement),
+                DefaultLabels.STRICTLY_NOT_CONTENT));
+
+        Element bodyElement = newDocument.getBody();
+        bodyElement.setClassName("comment");
+        assertFalse(hasLabel(ElementAction.getForElement(bodyElement),
+                DefaultLabels.STRICTLY_NOT_CONTENT));
+
         assertTrue(hasLabel(getForHtml("<div class=\" comment \"></div>"),
                     DefaultLabels.STRICTLY_NOT_CONTENT));
         assertTrue(hasLabel(getForHtml("<div class=\"foo.1 comment-thing\"></div>"),
@@ -94,7 +107,19 @@ public class ElementActionTest extends DomDistillerJsTestCase {
 
         assertTrue(hasLabel(getForHtml("<div class=\"user-comments\"></div>"),
                     DefaultLabels.STRICTLY_NOT_CONTENT));
+
+        /**
+         * Element.getClassName() returns SVGAnimatedString for SvgElement
+         * https://code.google.com/p/google-web-toolkit/issues/detail?id=9195
+         */
+        assertFalse(hasLabel(getForHtml("<svg></svg>"), DefaultLabels.STRICTLY_NOT_CONTENT));
+
+        assertFalse(hasLabel(getForHtml(
+                "<div class=\"user-comments another-class lots-of-classes too-many-classes" +
+                             "class1 class2 class3 class4 class5 class6 class7 class8\"></div>"),
+                DefaultLabels.STRICTLY_NOT_CONTENT));
+        assertTrue(hasLabel(getForHtml(
+                "<div class=\"     user-comments                         a       b   \"></div>"),
+                DefaultLabels.STRICTLY_NOT_CONTENT));
     }
-
-
 }

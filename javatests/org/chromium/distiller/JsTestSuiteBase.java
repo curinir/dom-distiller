@@ -8,6 +8,8 @@ import com.google.gwt.core.client.JavaScriptException;
 import com.google.gwt.regexp.shared.RegExp;
 import com.google.gwt.user.client.Window;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -87,11 +89,16 @@ public class JsTestSuiteBase {
             return this;
         }
 
-        public TestCaseResults run(TestLogger logger, TestFilter filter) {
+        public TestCaseResults run(TestLogger logger, TestFilter filter, boolean shuffle) {
             if (debug) logger.log(TestLogger.WARNING, "Starting " + testCaseName);
             TestCaseResults results = new TestCaseResults(testCaseName);
             try {
-                for (Map.Entry<String, TestCaseRunner> test : tests.entrySet()) {
+                List<Map.Entry<String, TestCaseRunner>> list =
+                        new ArrayList<Map.Entry<String, TestCaseRunner>>(tests.entrySet());
+                if (shuffle) {
+                    TestUtil.shuffle(list);
+                }
+                for (Map.Entry<String, TestCaseRunner> test : list) {
                     Assert.setDumpTraceOnFailure(true);
                     TestResult result = new TestResult();
                     if (!filter.test(testCaseName, test.getKey())) {
@@ -125,14 +132,56 @@ public class JsTestSuiteBase {
     }
 
     private class TestFilter {
-        RegExp regexp;
+        private final List<RegExp> pos;
+        private final List<RegExp> neg;
+
+        private RegExp convert(String q) {
+            // This is a simplified conversion, and doesn't handle all
+            // possible glob strings correctly.
+            q = q.replace(".", "\\.");
+            q = q.replace("*", ".*");
+            q = q.replace("?", ".");
+            return RegExp.compile("^" + q + "$");
+        }
+
         TestFilter(String filter) {
-            if (filter != null) regexp = RegExp.compile(filter);
+            pos = new ArrayList<RegExp>();
+            neg = new ArrayList<RegExp>();
+
+            if (filter == null) return;
+
+            String[] segments = filter.split("-");
+            if (segments.length > 2) {
+                LogUtil.logToConsole("[ERROR] filter \"" + filter + "\" is malformed.");
+            }
+            for (int i = 0; i < segments.length; i++) {
+                String[] filters = segments[i].split(":");
+                for (int j = 0; j < filters.length; j++) {
+                    if (filters[j].length() == 0) continue;
+                    RegExp r = convert(filters[j]);
+                    if (i == 0) {
+                        pos.add(r);
+                    } else {
+                        neg.add(r);
+                    }
+                }
+            }
         }
 
         public boolean test(String className, String methodName) {
-            if (regexp == null) return true;
-            return regexp.test(className + "." + methodName);
+            boolean ans = false;
+            if (pos.size() == 0) ans = true;
+            for (int i = 0; i < pos.size(); i++) {
+                if (pos.get(i).test(className + "." + methodName)) {
+                    ans = true;
+                }
+            }
+            for (int i = 0; i < neg.size(); i++) {
+                if (neg.get(i).test(className + "." + methodName)) {
+                    ans = false;
+                }
+            }
+            return ans;
         }
     }
 
@@ -158,10 +207,21 @@ public class JsTestSuiteBase {
     }
 
     public Map<String, TestCaseResults> run(TestLogger logger, String filterString) {
+        return run(logger, filterString, false);
+    }
+
+    public Map<String, TestCaseResults> run(
+            TestLogger logger, String filterString, boolean shuffle) {
         TreeMap<String, TestCaseResults> results = new TreeMap<String, TestCaseResults>();
         TestFilter filter = new TestFilter(filterString);
-        for (Map.Entry<String, TestCase> caseEntries : testCases.entrySet()) {
-            results.put(caseEntries.getKey(), caseEntries.getValue().run(logger, filter));
+        List<Map.Entry<String, TestCase>> list =
+                new ArrayList<Map.Entry<String, TestCase>>(testCases.entrySet());
+        if (shuffle) {
+            TestUtil.shuffle(list);
+        }
+        for (Map.Entry<String, TestCase> caseEntries : list) {
+            results.put(caseEntries.getKey(),
+                        caseEntries.getValue().run(logger, filter, shuffle));
         }
         for (Map.Entry<String, TestCaseResults> resultsEntry : results.entrySet()) {
             logger.log(TestLogger.RESULTS, "Results for " + resultsEntry.getKey());

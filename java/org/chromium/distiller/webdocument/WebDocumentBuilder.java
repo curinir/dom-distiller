@@ -21,9 +21,8 @@
  */
 package org.chromium.distiller.webdocument;
 
-import org.chromium.distiller.ContentExtractor;
-
 import com.google.gwt.dom.client.Element;
+import com.google.gwt.dom.client.Node;
 import com.google.gwt.dom.client.Text;
 
 import java.util.Stack;
@@ -34,6 +33,7 @@ import java.util.Stack;
 public class WebDocumentBuilder implements WebDocumentBuilderInterface {
     private int tagLevel;
     private int nextWebTextIndex;
+    private int groupNumber;
 
     private WebDocument document = new WebDocument();
     private boolean flush;
@@ -41,6 +41,7 @@ public class WebDocumentBuilder implements WebDocumentBuilderInterface {
     private WebTextBuilder webTextBuilder = new WebTextBuilder();
 
     public WebDocumentBuilder() {
+        groupNumber = 0;
     }
 
     @Override
@@ -73,7 +74,8 @@ public class WebDocumentBuilder implements WebDocumentBuilderInterface {
         }
 
         if (flush || a.flush) {
-            flushBlock();
+            flushBlock(groupNumber);
+            groupNumber++;
         }
 
         if (a.isAnchor) {
@@ -88,11 +90,34 @@ public class WebDocumentBuilder implements WebDocumentBuilderInterface {
     @Override
     public void textNode(Text textNode) {
         if (flush) {
-            flushBlock();
+            flushBlock(groupNumber);
+            groupNumber++;
             flush = false;
         }
 
         webTextBuilder.textNode(textNode, tagLevel);
+    }
+
+    @Override
+    public void lineBreak(Node node) {
+        if (flush) {
+            flushBlock(groupNumber);
+            groupNumber++;
+            flush = false;
+        }
+        webTextBuilder.lineBreak(node);
+    }
+
+    @Override
+    public void dataTable(Element e) {
+        flushBlock(groupNumber);
+        document.addTable(new WebTable(e));
+    }
+
+    @Override
+    public void embed(WebElement embedNode) {
+        flushBlock(groupNumber);
+        document.addEmbed(embedNode);
     }
 
     private void enterAnchor() {
@@ -103,9 +128,10 @@ public class WebDocumentBuilder implements WebDocumentBuilderInterface {
         webTextBuilder.exitAnchor();
     }
 
-    public void flushBlock() {
+    public void flushBlock(int group) {
         WebText tb = webTextBuilder.build(nextWebTextIndex);
         if (tb != null) {
+            tb.setGroupNumber(group);
             nextWebTextIndex++;
             addWebText(tb);
         }
@@ -126,7 +152,7 @@ public class WebDocumentBuilder implements WebDocumentBuilderInterface {
      */
     public WebDocument toWebDocument() {
         // Just to be sure.
-        flushBlock();
+        flushBlock(groupNumber);
         return document;
     }
 

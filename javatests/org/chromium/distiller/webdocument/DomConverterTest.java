@@ -10,6 +10,8 @@ import org.chromium.distiller.DomWalker;
 import com.google.gwt.dom.client.Document;
 import com.google.gwt.dom.client.Element;
 
+import java.util.List;
+
 public class DomConverterTest extends DomDistillerJsTestCase {
     private void runTest(String innerHtml, String expectedHtml) throws Throwable {
         Element container = Document.get().createDivElement();
@@ -103,7 +105,7 @@ public class DomConverterTest extends DomDistillerJsTestCase {
                               "</tr>" +
                           "</tbody>" +
                       "</table>";
-        runTest(html, "");
+        runTest(html, "<datatable/>");
     }
 
     public void testNonDataTable() throws Throwable {
@@ -127,5 +129,27 @@ public class DomConverterTest extends DomDistillerJsTestCase {
         runTest("<object></object>", "");
         runTest("<option></option>", "");
         runTest("<embed></embed>", "");
+    }
+
+    public void testElementOrder() {
+        Element container = Document.get().createDivElement();
+        container.setInnerHTML("Text content <img src=\"http://example.com/1.jpg\"> more content");
+
+        WebDocumentBuilder builder = new WebDocumentBuilder();
+        DomConverter converter = new DomConverter(builder);
+        new DomWalker(converter).walk(container);
+
+        WebDocument doc = builder.toWebDocument();
+        List<WebElement> elements = doc.getElements();
+
+        assertEquals(3, elements.size());
+        assertTrue(elements.get(0) instanceof WebText);
+        assertTrue(elements.get(1) instanceof WebImage);
+        assertTrue(elements.get(2) instanceof WebText);
+    }
+
+    public void testLineBreak() throws Throwable {
+        String html = "text<br>split<br/>with<br/>lines";
+        runTest(html, "text\nsplit\nwith\nlines");
     }
 }

@@ -13,13 +13,13 @@ import org.chromium.distiller.proto.DomDistillerProtos.TimingInfo;
 import org.chromium.distiller.webdocument.DomConverter;
 import org.chromium.distiller.webdocument.WebDocument;
 import org.chromium.distiller.webdocument.WebDocumentBuilder;
+import org.chromium.distiller.webdocument.WebImage;
+import org.chromium.distiller.webdocument.filters.RelevantElements;
+import org.chromium.distiller.webdocument.filters.LeadImageFinder;
 
-import com.google.gwt.dom.client.AnchorElement;
 import com.google.gwt.dom.client.Document;
 import com.google.gwt.dom.client.Element;
 import com.google.gwt.dom.client.Node;
-import com.google.gwt.dom.client.NodeList;
-import com.google.gwt.dom.client.VideoElement;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -38,7 +38,6 @@ public class ContentExtractor {
     private class WebDocumentInfo {
         WebDocument document;
         Set<Node> hiddenElements;
-        Set<Node> dataTables;
     }
 
     public ContentExtractor(Element root) {
@@ -91,17 +90,17 @@ public class ContentExtractor {
 
         now = DomUtil.getTime();
         processDocument(documentInfo.document);
-        List<Node> contentNodes = documentInfo.document.getContentNodes(false);
-        contentNodes =
-                RelevantElementsFinder.findAndAddElements(contentNodes, documentInfo.hiddenElements,
-                        documentInfo.dataTables, Document.get().getDocumentElement());
+        RelevantElements.process(documentInfo.document);
+        LeadImageFinder.process(documentInfo.document);
 
+        List<WebImage> images = documentInfo.document.getContentImages();
+        for (WebImage wi : images) {
+            imageUrls.add(wi.getSrc());
+        }
         mTimingInfo.setArticleProcessingTime(DomUtil.getTime() - now);
 
-        if (contentNodes.isEmpty()) return "";
-
         now = DomUtil.getTime();
-        String html = formatExtractedNodes(textOnly, contentNodes);
+        String html = documentInfo.document.generateOutput(textOnly);
         mTimingInfo.setFormattingTime(DomUtil.getTime() - now);
 
         if (LogUtil.isLoggable(LogUtil.DEBUG_LEVEL_TIMING_INFO)) {
@@ -169,8 +168,6 @@ public class ContentExtractor {
         new DomWalker(converter).walk(documentElement);
         info.document = documentBuilder.toWebDocument();
         ensureTitleInitialized();
-
-        info.dataTables = converter.getDataTables();
         info.hiddenElements = converter.getHiddenElements();
 
         return info;
@@ -188,118 +185,4 @@ public class ContentExtractor {
         mStatisticsInfo.setWordCount(TextDocumentStatistics.countWordsInContent(textDocument));
         textDocument.applyToModel();
     }
-
-    /**
-     * Creates a new minimal HTML document containing copies of the DOM nodes identified as the
-     * core elements of the page. Some additional re-formatting hints may be included in the new
-     * document.
-     *
-     * @param textOnly indicates whether to simply return the aggregated text content instead of
-     *        HTML
-     * @param contentNodes the DOM nodes containing text to be included in the final docuemnt.
-     * @return A HTML or text document which includes the aggregated content of the provided HTML
-     *        nodes.
-     */
-    private String formatExtractedNodes(boolean textOnly, List<Node> contentNodes) {
-        NodeTree expandedList = NodeListExpander.expand(contentNodes);
-        Node clonedSubtree = expandedList.cloneSubtreeRetainDirection();
-        if (clonedSubtree.getNodeType() != Node.ELEMENT_NODE) return "";
-
-        // determine text directionality
-        textDirection = Element.as(clonedSubtree).getAttribute("dir");
-
-        // The base URL in the distilled page viewer is different from that in
-        // the live page.  This breaks all relative links (in anchors,
-        // images, etc.), so make them absolute in the distilled content.
-        makeAllLinksAbsolute(clonedSubtree);
-
-        // Get URLs of the extracted images.
-        if (clonedSubtree.getNodeType() == Node.ELEMENT_NODE) {
-            NodeList<Element> allImages = Element.as(clonedSubtree).getElementsByTagName("IMG");
-            for (int i = 0; i < allImages.getLength(); i++) {
-                String imageUrl = allImages.getItem(i).getAttribute("src");
-                if (!imageUrl.isEmpty()) {
-                    imageUrls.add(imageUrl);
-                }
-            }
-        }
-
-        if (textOnly) {
-            return getTextFromTree(clonedSubtree);
-        }
-
-        // TODO(cjhopman): this discards the top element and just returns its children. This might
-        // break in some cases.
-        return Element.as(clonedSubtree).getInnerHTML();
-    }
-
-    /**
-     * Strips all "id" attributes from nodes in the tree rooted at |clonedSubtree|
-     */
-    private static void stripIds(Node node) {
-        switch (node.getNodeType()) {
-            case Node.ELEMENT_NODE:
-                Element e = Element.as(node);
-                if (e.hasAttribute("id")) {
-                    e.setAttribute("id", "");
-                }
-                // Intentional fall-through.
-            case Node.DOCUMENT_NODE:
-                for (int i = 0; i < node.getChildCount(); i++) {
-                    stripIds(node.getChild(i));
-                }
-        }
-    }
-
-    private static String getTextFromTree(Node node) {
-        stripIds(node);
-
-        // Temporarily add the node to the DOM so that style is calculated.
-        Document.get().getBody().appendChild(node);
-        String output = DomUtil.getInnerText(node);
-
-        // And remove it again.
-        Document.get().getBody().removeChild(node);
-        return output;
-    }
-
-    private static void makeAllLinksAbsolute(Node rootNode) {
-        Element root = Element.as(rootNode);
-
-        // AnchorElement.getHref() and ImageElement.getSrc() both return the
-        // absolute URI, so simply set them as the respective attributes.
-
-        NodeList<Element> allLinks = root.getElementsByTagName("A");
-        for (int i = 0; i < allLinks.getLength(); i++) {
-            AnchorElement link = AnchorElement.as(allLinks.getItem(i));
-            if (!link.getHref().isEmpty()) {
-                link.setHref(link.getHref());
-            }
-        }
-        NodeList<Element> videoTags = root.getElementsByTagName("VIDEO");
-        for (int i = 0; i < videoTags.getLength(); i++) {
-            VideoElement video = (VideoElement) videoTags.getItem(i);
-            if (!video.getPoster().isEmpty()) {
-                video.setPoster(video.getPoster());
-            }
-        }
-        makeAllSrcAttributesAbsolute(root);
-    }
-
-    private static native void makeAllSrcAttributesAbsolute(Element root) /*-{
-        if (!root.querySelectorAll) {
-            // In all contexts we intend to support, root.querySelectorAll is
-            // available. This is just a hack to allow this function to be
-            // run in gwt. Note that the underlying functionality is tested in
-            // chromium, so we have coverage for it.
-            return;
-        }
-        var elementsWithSrc = root.querySelectorAll('img,source,track,video');
-        for (var key in elementsWithSrc) {
-            if (elementsWithSrc[key].src) {
-                elementsWithSrc[key].src = elementsWithSrc[key].src;
-            }
-        }
-    }-*/;
-
 }
