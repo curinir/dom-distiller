@@ -216,7 +216,7 @@ out/Debug/chrome --enable-dom-distiller
 - To have a unique user profile every time you run Chrome, you can also add
 `--user-data-dir=/tmp/$(mktemp -d)` as a command line parameter.
 On Mac OS X, you can instead write
-`--user-data-dir=$(mktemp -d 2>/dev/null || mktemp -d -t 'chromeprofile')`.
+`--user-data-dir=$(mktemp -d -t 'chromeprofile')`.
 
 ## Running the automated tests in Chromium
 
